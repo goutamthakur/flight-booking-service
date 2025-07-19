@@ -8,4 +8,5 @@ module.exports = {
   DB_PASSWORD: process.env.DB_PASSWORD,
   DB_NAME: process.env.DB_NAME,
   DB_HOST: process.env.DB_HOST,
+  FLIGHT_SERVICE_API_URL: process.env.FLIGHT_SERVICE_API_URL,
 };
