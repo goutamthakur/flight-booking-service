@@ -10,5 +10,11 @@ router.post(
   BookingController.createBooking,
 );
 
+// POST /api/v1/bookings/payment
+router.post(
+  "/payment",
+  BookingController.makePayment,
+);
+
 
 module.exports = router;

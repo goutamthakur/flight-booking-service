@@ -5,7 +5,6 @@ const { BookingService } = require("../services");
 
 async function createBooking(req, res) {
   try {
-    console.log("req.body", req.body);
     const booking = await BookingService.createBooking(req.body);
     SuccessResponse.message = "Successfully created booking";
     SuccessResponse.data = booking;
@@ -16,6 +15,19 @@ async function createBooking(req, res) {
   }
 }
 
+async function makePayment(req, res) {
+  try {
+    const booking = await BookingService.makePayment(req.body);
+    SuccessResponse.message = "Successfully made payment for booking";
+    SuccessResponse.data = booking;
+    return res.status(StatusCodes.CREATED).json(SuccessResponse);
+  } catch (error) {
+    ErrorResponse.error = error;
+    return res.status(error.statusCode).json(ErrorResponse);
+  }
+}
+
 module.exports = {
   createBooking,
+  makePayment,
 };

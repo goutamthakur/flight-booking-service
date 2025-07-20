@@ -5,6 +5,8 @@ const AppError = require("../utils/errors/app-error");
 const { BookingRepository } = require("../repositories");
 const db = require("../models");
 const { ServerConfig } = require("../config");
+const { Enums } = require("../utils/common");
+const { BOOKED } = Enums.BOOKING_STATUS;
 
 const bookingRepository = new BookingRepository();
 
@@ -13,7 +15,6 @@ async function createBooking(data) {
     // Managed transaction.
     // Rollback is done by manually throwing an error.
     const result = await db.sequelize.transaction(async function booking(t) {
-      console.log("Booking transaction starts:", new Date());
       const flight = await axios.get(
         `${ServerConfig.FLIGHT_SERVICE_API_URL}/api/v1/flights/${data?.flightId}`
       );
@@ -24,27 +25,34 @@ async function createBooking(data) {
           StatusCodes.BAD_REQUEST
         );
       }
-      // Total payable amount flight ticket price * no. of seats
+
+      // Booking is created with status initiated and seats have been put on hold
       const totalCost = data?.noOfSeats * flightData.price;
-      // First updating the seats in the fight
-      // This update must also be part of this transanction
-      console.log("Updating seats in flight starts:", new Date());
-      await axios.patch(
+      const bookingPayload = { ...data, totalCost };
+      const booking = await bookingRepository.createBooking(bookingPayload, t);
+
+      const updateFlightSeats = await axios.patch(
         `${ServerConfig.FLIGHT_SERVICE_API_URL}/api/v1/flights/${data?.flightId}/seats`,
         {
           seats: data?.noOfSeats,
         }
       );
-      console.log("Updating seats in flight ends:", new Date());
-      // Second preparing the payload and creating a booking for a user
-      const bookingPayload = { ...data, totalCost };
-      const booking = await bookingRepository.createBooking(bookingPayload, t);
-      return booking;
+
+      if (updateFlightSeats.data.success) {
+        return booking;
+      } else {
+        throw new AppError(
+          "Error updating flight seats",
+          StatusCodes.INTERNAL_SERVER_ERROR
+        );
+      }
     });
-    console.log("Booking transaction ends:", new Date());
     return result;
   } catch (error) {
-    if (error.statusCode === StatusCodes.BAD_REQUEST) {
+    if (
+      error.statusCode === StatusCodes.BAD_REQUEST ||
+      error.statusCode === StatusCodes.INTERNAL_SERVER_ERROR
+    ) {
       throw error;
     }
     throw new AppError(
@@ -54,6 +62,42 @@ async function createBooking(data) {
   }
 }
 
+async function makePayment(data) {
+  const bookingId = parseInt(data.bookingId);
+  const userId = parseInt(data.userId);
+  const amount = parseFloat(data.amount);
+
+  const t = await db.sequelize.transaction();
+  try {
+    const bookingDetails = await bookingRepository.getBooking(bookingId, t);
+
+    if (userId != bookingDetails.userId) {
+      throw new AppError(
+        "Booking does not belongs to user id",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+    if (amount != bookingDetails.totalCost) {
+      throw new AppError(
+        "Amount does not match the booking amount",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+    // Assuming payment is done
+    const updatedBooking = await bookingRepository.updateBooking(
+      bookingId,
+      { status: BOOKED },
+      t
+    );
+    await t.commit();
+    return updatedBooking;
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+}
+
 module.exports = {
   createBooking,
+  makePayment,
 };
