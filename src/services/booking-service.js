@@ -6,7 +6,7 @@ const { BookingRepository } = require("../repositories");
 const db = require("../models");
 const { ServerConfig } = require("../config");
 const { Enums } = require("../utils/common");
-const { BOOKED } = Enums.BOOKING_STATUS;
+const { BOOKED, CANCELLED } = Enums.BOOKING_STATUS;
 
 const bookingRepository = new BookingRepository();
 
@@ -70,7 +70,38 @@ async function makePayment(data) {
   const t = await db.sequelize.transaction();
   try {
     const bookingDetails = await bookingRepository.getBooking(bookingId, t);
+    if (bookingDetails.status === CANCELLED) {
+      throw new AppError(
+        "Booking is already cancelled",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+    const bookingTime = new Date(bookingDetails.createdAt);
+    const currentTime = new Date();
 
+    if (currentTime - bookingTime > 600000) {
+      // Releasing the seats by the booking
+      const updateFlightSeats = await axios.patch(
+        `${ServerConfig.FLIGHT_SERVICE_API_URL}/api/v1/flights/${bookingDetails?.flightId}/seats`,
+        {
+          seats: bookingDetails.noOfSeats,
+          dec: false,
+        }
+      );
+      // Updating the status of booking to cancelled
+      if (updateFlightSeats.data.success) {
+        await bookingRepository.update(bookingId, { status: CANCELLED });
+        throw new AppError(
+          "Booking cancelled due to late payment request",
+          StatusCodes.BAD_REQUEST
+        );
+      } else {
+        throw new AppError(
+          "Error updating flight seats",
+          StatusCodes.INTERNAL_SERVER_ERROR
+        );
+      }
+    }
     if (userId != bookingDetails.userId) {
       throw new AppError(
         "Booking does not belongs to user id",
@@ -83,6 +114,7 @@ async function makePayment(data) {
         StatusCodes.BAD_REQUEST
       );
     }
+    // Hitting some third-party payment provider
     // Assuming payment is done
     const updatedBooking = await bookingRepository.updateBooking(
       bookingId,
@@ -93,7 +125,17 @@ async function makePayment(data) {
     return updatedBooking;
   } catch (error) {
     await t.rollback();
-    throw error;
+    if (
+      error.statusCode === StatusCodes.BAD_REQUEST ||
+      error.statusCode === StatusCodes.NOT_FOUND ||
+      error.statusCode === StatusCodes.INTERNAL_SERVER_ERROR
+    ) {
+      throw error;
+    }
+    throw new AppError(
+      "Something went wrong while booking",
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
   }
 }
 
