@@ -7,6 +7,7 @@ const db = require("../models");
 const { ServerConfig } = require("../config");
 const { Enums } = require("../utils/common");
 const { BOOKED, CANCELLED } = Enums.BOOKING_STATUS;
+const { Logger } = require("../config");
 
 const bookingRepository = new BookingRepository();
 
@@ -139,7 +140,19 @@ async function makePayment(data) {
   }
 }
 
+async function cancelOldBooking() {
+  try {
+    // time is 10 minutes behind from current time
+    // cancel all the bookings which are less than this time
+    const time = new Date(Date.now() - 10 * 60 * 1000);
+    const response = await bookingRepository.cancelOldBooking(time);
+  } catch (error) {
+    Logger.error(`booking-service > cancelOldBooking > ${error}`);
+  }
+}
+
 module.exports = {
   createBooking,
   makePayment,
+  cancelOldBooking,
 };

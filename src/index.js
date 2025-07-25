@@ -2,6 +2,7 @@ const express = require("express");
 
 const { ServerConfig } = require("./config");
 const apiRoutes = require("./routes");
+const initJobs = require("./jobs");
 
 const app = express();
 
@@ -19,4 +20,6 @@ app.listen(ServerConfig.PORT, () => {
   console.log(
     `Successfully started the flight-booking-service on PORT: ${ServerConfig.PORT}`
   );
+  // Initialize background jobs like cron etc
+  initJobs();
 });
