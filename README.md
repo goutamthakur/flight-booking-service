@@ -1,6 +1,6 @@
 # 💺 Flight Booking Microservice
 
-This repository contains the flight ticket booking service, which is part of a larger airline booking system. The entire source code resides within the `src` directory and follows a clean modular structure for scalability and maintainability.
+This repository contains the flight ticket booking service, which is part of a larger flight booking system. The entire source code resides within the `src` directory and follows a clean modular structure for scalability and maintainability.
 
 ## 📁 Project Structure
 
