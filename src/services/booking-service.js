@@ -4,7 +4,7 @@ const { StatusCodes } = require("http-status-codes");
 const AppError = require("../utils/errors/app-error");
 const { BookingRepository } = require("../repositories");
 const db = require("../models");
-const { ServerConfig } = require("../config");
+const { ServerConfig, MQ } = require("../config");
 const { Enums } = require("../utils/common");
 const { BOOKED, CANCELLED } = Enums.BOOKING_STATUS;
 const { Logger } = require("../config");
@@ -123,6 +123,16 @@ async function makePayment(data) {
       t
     );
     await t.commit();
+
+    // Payment is done and commited now sending email notification
+    MQ.sendEmailNotification({
+      userId: userId,
+      bookingId: bookingId,
+      flightId: bookingDetails?.flightId,
+      noOfSeats: bookingDetails?.noOfSeats,
+      paidAmount: amount,
+    });
+
     return updatedBooking;
   } catch (error) {
     await t.rollback();
@@ -142,7 +152,7 @@ async function makePayment(data) {
 
 async function cancelOldBooking() {
   try {
-    // time is 10 minutes behind from current time
+    // const time is 10 minutes behind from current time
     // cancel all the bookings which are less than this time
     const time = new Date(Date.now() - 10 * 60 * 1000);
     const response = await bookingRepository.cancelOldBooking(time);

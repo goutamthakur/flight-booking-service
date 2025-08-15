@@ -1,6 +1,6 @@
 const express = require("express");
 
-const { ServerConfig } = require("./config");
+const { ServerConfig, MQ } = require("./config");
 const apiRoutes = require("./routes");
 const initJobs = require("./jobs");
 
@@ -22,4 +22,6 @@ app.listen(ServerConfig.PORT, () => {
   );
   // Initialize background jobs like cron etc
   initJobs();
+  // Connect to RabbitMQ
+  MQ.connectToRabbitMQ();
 });
