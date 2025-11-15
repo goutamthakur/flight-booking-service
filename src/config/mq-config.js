@@ -2,7 +2,7 @@ const amqplib = require("amqplib");
 
 const { MQ_URL } = require("./server-config");
 
-const queue = "email.notification";
+const queue = "booking.created";
 
 let connection, channel;
 
